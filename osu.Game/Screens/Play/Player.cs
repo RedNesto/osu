@@ -2,7 +2,6 @@
 // Licensed under the MIT Licence - https://raw.githubusercontent.com/ppy/osu/master/LICENCE
 
 using OpenTK;
-using OpenTK.Graphics;
 using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
@@ -33,13 +32,15 @@ namespace osu.Game.Screens.Play
 
         internal override bool ShowOverlays => false;
 
-        internal override bool HasLocalCursorDisplayed => !hasReplayLoaded && !IsPaused;
+        internal override bool HasLocalCursorDisplayed => !hasReplayLoaded && !IsPaused && !IsFailed;
 
         private bool hasReplayLoaded => hitRenderer.InputManager.ReplayInputHandler != null;
 
         public BeatmapInfo BeatmapInfo;
 
         public bool IsPaused { get; private set; }
+
+        public bool IsFailed { get; private set; }
 
         public int RestartCount;
 
@@ -60,6 +61,7 @@ namespace osu.Game.Screens.Play
 
         private HudOverlay hudOverlay;
         private PauseOverlay pauseOverlay;
+        private FailOverlay failOverlay;
 
         [BackgroundDependencyLoader]
         private void load(AudioManager audio, BeatmapDatabase beatmaps, OsuConfigManager config)
@@ -130,7 +132,18 @@ namespace osu.Game.Screens.Play
                     Schedule(Resume);
                 },
                 OnRetry = Restart,
-                OnQuit = Exit
+                OnQuit = Exit,
+                Title = @"paused",
+                Description = @"you're not going to do what i think you're going to do, are ya?",
+            };
+
+            failOverlay = new FailOverlay
+            {
+                Depth = -1,
+                OnRetry = Restart,
+                OnQuit = Exit,
+                Title = @"failed",
+                Description = @"you're dead, try again?",
             };
 
 
@@ -161,7 +174,8 @@ namespace osu.Game.Screens.Play
                     }
                 },
                 hudOverlay,
-                pauseOverlay
+                pauseOverlay,
+                failOverlay
             };
         }
 
@@ -261,15 +275,13 @@ namespace osu.Game.Screens.Play
 
         private void onFail()
         {
-            Content.FadeColour(Color4.Red, 500);
             sourceClock.Stop();
 
             Delay(500);
-            Schedule(delegate
-            {
-                ValidForResume = false;
-                Push(new FailDialog());
-            });
+
+            IsFailed = true;
+            failOverlay.Retries = RestartCount;
+            failOverlay.Show();
         }
 
         protected override void OnEntering(Screen last)
@@ -339,6 +351,6 @@ namespace osu.Game.Screens.Play
 
         public ReplayInputHandler ReplayInputHandler;
 
-        protected override bool OnWheel(InputState state) => mouseWheelDisabled.Value && !IsPaused;
+        protected override bool OnWheel(InputState state) => mouseWheelDisabled.Value && !IsPaused && !IsFailed;
     }
 }
