@@ -10,17 +10,14 @@ namespace osu.Game.Modes.Judgements
         /// <summary>
         /// Whether this judgement is the result of a hit or a miss.
         /// </summary>
-        public HitResult? Result;
+        public HitResult Result;
 
         /// <summary>
         /// The offset at which this judgement occurred.
         /// </summary>
         public double TimeOffset;
 
-        /// <summary>
-        /// The combo after this judgement was processed.
-        /// </summary>
-        public ulong? ComboAtHit;
+        public virtual bool AffectsCombo => true;
 
         /// <summary>
         /// The string representation for the result achieved.

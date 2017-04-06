@@ -7,7 +7,6 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Sprites;
-using osu.Framework.Graphics.Transforms;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Framework.Extensions.Color4Extensions;
@@ -142,17 +141,24 @@ namespace osu.Game.Screens.Select.Leaderboards
                             Padding = new MarginPadding(edge_margin),
                             Children = new Drawable[]
                             {
-                                avatar = new Avatar(Score.User ?? new User { Id = Score.UserID })
-                                {
-                                    Size = new Vector2(HEIGHT - edge_margin * 2, HEIGHT - edge_margin * 2),
-                                    CornerRadius = corner_radius,
-                                    Masking = true,
-                                    EdgeEffect = new EdgeEffect
+                                avatar = new DelayedLoadWrapper(
+                                    new Avatar(Score.User ?? new User { Id = Score.UserID })
                                     {
-                                        Type = EdgeEffectType.Shadow,
-                                        Radius = 1,
-                                        Colour = Color4.Black.Opacity(0.2f),
-                                    },
+                                        RelativeSizeAxes = Axes.Both,
+                                        CornerRadius = corner_radius,
+                                        Masking = true,
+                                        OnLoadComplete = d => d.FadeInFromZero(200),
+                                        EdgeEffect = new EdgeEffect
+                                        {
+                                            Type = EdgeEffectType.Shadow,
+                                            Radius = 1,
+                                            Colour = Color4.Black.Opacity(0.2f),
+                                        },
+                                    })
+                                {
+                                    TimeBeforeLoad = 500,
+                                    RelativeSizeAxes = Axes.None,
+                                    Size = new Vector2(HEIGHT - edge_margin * 2, HEIGHT - edge_margin * 2),
                                 },
                                 new Container
                                 {

@@ -4,11 +4,17 @@
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Input;
 using OpenTK.Input;
+using osu.Game.Graphics;
+using OpenTK.Graphics;
+using osu.Framework.Allocation;
 
 namespace osu.Game.Screens.Play
 {
-    public class FailOverlay : InGameOverlay
+    public class FailOverlay : MenuOverlay
     {
+
+        public override string Header => "failed";
+        public override string Description => "you're dead, try again?";
         protected override bool OnKeyDown(InputState state, KeyDownEventArgs args)
         {
             if (args.Key == Key.Escape)
@@ -19,6 +25,13 @@ namespace osu.Game.Screens.Play
             }
 
             return base.OnKeyDown(state, args);
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(OsuColour colours)
+        {
+            AddButton("Retry", colours.YellowDark, OnRetry);
+            AddButton("Quit", new Color4(170, 27, 39, 255), OnQuit);
         }
     }
 }

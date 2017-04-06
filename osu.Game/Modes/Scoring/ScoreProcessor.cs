@@ -8,6 +8,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Modes.Judgements;
 using osu.Game.Modes.Objects;
 using osu.Game.Modes.UI;
+using osu.Game.Modes.Objects.Drawables;
 
 namespace osu.Game.Modes.Scoring
 {
@@ -141,24 +142,55 @@ namespace osu.Game.Modes.Scoring
         /// <param name="judgement">The judgement to add.</param>
         protected void AddJudgement(TJudgement judgement)
         {
-            Judgements.Add(judgement);
+            bool exists = Judgements.Contains(judgement);
 
-            OnNewJugement(judgement);
+            if (!exists)
+            {
+                if (judgement.AffectsCombo)
+                {
+                    switch (judgement.Result)
+                    {
+                        case HitResult.Miss:
+                            Combo.Value = 0;
+                            break;
+                        case HitResult.Hit:
+                            Combo.Value++;
+                            break;
+                    }
+                }
 
-            judgement.ComboAtHit = (ulong)Combo.Value;
+                Judgements.Add(judgement);
+                OnNewJudgement(judgement);
+            }
+            else
+                OnJudgementChanged(judgement);
 
             UpdateFailed();
         }
 
         protected override void Reset()
         {
+            base.Reset();
+
             Judgements.Clear();
         }
 
         /// <summary>
-        /// Update any values that potentially need post-processing on a judgement change.
+        /// Updates any values that need post-processing. Invoked when a new judgement has occurred.
+        /// <para>
+        /// This is not triggered when existing judgements are changed - for that see <see cref="OnJudgementChanged(TJudgement)"/>.
+        /// </para>
         /// </summary>
         /// <param name="judgement">The judgement that triggered this calculation.</param>
-        protected abstract void OnNewJugement(TJudgement judgement);
+        protected abstract void OnNewJudgement(TJudgement judgement);
+
+        /// <summary>
+        /// Updates any values that need post-processing. Invoked when an existing judgement has changed.
+        /// <para>
+        /// This is not triggered when a new judgement has occurred - for that see <see cref="OnNewJudgement(TJudgement)"/>.
+        /// </para>
+        /// </summary>
+        /// <param name="judgement">The judgement that triggered this calculation.</param>
+        protected virtual void OnJudgementChanged(TJudgement judgement) { }
     }
 }

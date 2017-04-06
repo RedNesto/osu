@@ -12,7 +12,6 @@ using osu.Framework.Input;
 using osu.Game.Configuration;
 using System;
 using osu.Framework.Graphics.Textures;
-using osu.Framework.Graphics.Transforms;
 
 namespace osu.Game.Graphics.Cursor
 {
@@ -132,13 +131,8 @@ namespace osu.Game.Graphics.Cursor
                 };
 
                 cursorScale = config.GetBindable<double>(OsuConfig.MenuCursorSize);
-                cursorScale.ValueChanged += scaleChanged;
+                cursorScale.ValueChanged += newScale => cursorContainer.Scale = new Vector2((float)newScale);
                 cursorScale.TriggerChange();
-            }
-
-            private void scaleChanged(object sender, EventArgs e)
-            {
-                cursorContainer.Scale = new Vector2((float)cursorScale);
             }
         }
     }

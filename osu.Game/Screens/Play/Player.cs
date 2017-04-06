@@ -8,14 +8,12 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
-using osu.Framework.Graphics.Transforms;
 using osu.Framework.Input;
 using osu.Framework.Logging;
 using osu.Framework.Screens;
 using osu.Framework.Timing;
 using osu.Game.Configuration;
 using osu.Game.Database;
-using osu.Game.Input.Handlers;
 using osu.Game.Modes;
 using osu.Game.Modes.UI;
 using osu.Game.Screens.Backgrounds;
@@ -32,15 +30,13 @@ namespace osu.Game.Screens.Play
 
         internal override bool ShowOverlays => false;
 
-        internal override bool HasLocalCursorDisplayed => !hasReplayLoaded && !IsPaused && !IsFailed;
-
-        private bool hasReplayLoaded => hitRenderer.InputManager.ReplayInputHandler != null;
+        internal override bool HasLocalCursorDisplayed => !IsPaused && !HasFailed && HitRenderer.ProvidingUserCursor;
 
         public BeatmapInfo BeatmapInfo;
 
         public bool IsPaused { get; private set; }
 
-        public bool IsFailed { get; private set; }
+        public bool HasFailed { get; private set; }
 
         public int RestartCount;
 
@@ -55,7 +51,7 @@ namespace osu.Game.Screens.Play
         private Ruleset ruleset;
 
         private ScoreProcessor scoreProcessor;
-        private HitRenderer hitRenderer;
+        protected HitRenderer HitRenderer;
         private Bindable<int> dimLevel;
         private SkipButton skipButton;
 
@@ -68,7 +64,7 @@ namespace osu.Game.Screens.Play
         {
             var beatmap = Beatmap.Beatmap;
 
-            if (beatmap.BeatmapInfo?.Mode > PlayMode.Osu)
+            if (beatmap.BeatmapInfo?.Mode > PlayMode.Taiko)
             {
                 //we only support osu! mode for now because the hitobject parsing is crappy and needs a refactor.
                 Exit();
@@ -115,45 +111,17 @@ namespace osu.Game.Screens.Play
             });
 
             ruleset = Ruleset.GetRuleset(Beatmap.PlayMode);
-            hitRenderer = ruleset.CreateHitRendererWith(Beatmap);
+            HitRenderer = ruleset.CreateHitRendererWith(Beatmap);
 
-            scoreProcessor = hitRenderer.CreateScoreProcessor();
+            scoreProcessor = HitRenderer.CreateScoreProcessor();
 
             hudOverlay = new StandardHudOverlay();
             hudOverlay.KeyCounter.Add(ruleset.CreateGameplayKeys());
             hudOverlay.BindProcessor(scoreProcessor);
-
-            pauseOverlay = new PauseOverlay
-            {
-                Depth = -1,
-                OnResume = delegate
-                {
-                    Delay(400);
-                    Schedule(Resume);
-                },
-                OnRetry = Restart,
-                OnQuit = Exit,
-                Title = @"paused",
-                Description = @"you're not going to do what i think you're going to do, are ya?",
-            };
-
-            failOverlay = new FailOverlay
-            {
-                Depth = -1,
-                OnRetry = Restart,
-                OnQuit = Exit,
-                Title = @"failed",
-                Description = @"you're dead, try again?",
-            };
-
-
-            if (ReplayInputHandler != null)
-                hitRenderer.InputManager.ReplayInputHandler = ReplayInputHandler;
-
-            hudOverlay.BindHitRenderer(hitRenderer);
+            hudOverlay.BindHitRenderer(HitRenderer);
 
             //bind HitRenderer to ScoreProcessor and ourselves (for a pass situation)
-            hitRenderer.OnAllJudged += onCompletion;
+            HitRenderer.OnAllJudged += onCompletion;
 
             //bind ScoreProcessor to ourselves (for a fail situation)
             scoreProcessor.Failed += onFail;
@@ -166,7 +134,7 @@ namespace osu.Game.Screens.Play
                     Clock = interpolatedSourceClock,
                     Children = new Drawable[]
                     {
-                        hitRenderer,
+                        HitRenderer,
                         skipButton = new SkipButton
                         {
                             Alpha = 0
@@ -174,8 +142,21 @@ namespace osu.Game.Screens.Play
                     }
                 },
                 hudOverlay,
-                pauseOverlay,
-                failOverlay
+                pauseOverlay = new PauseOverlay
+                {
+                    OnResume = delegate
+                    {
+                        Delay(400);
+                        Schedule(Resume);
+                    },
+                    OnRetry = Restart,
+                    OnQuit = Exit,
+                },
+                failOverlay = new FailOverlay
+                {
+                    OnRetry = Restart,
+                    OnQuit = Exit,
+                }
             };
         }
 
@@ -244,7 +225,7 @@ namespace osu.Game.Screens.Play
 
             var newPlayer = new Player();
 
-            newPlayer.LoadAsync(Game, delegate
+            LoadComponentAsync(newPlayer, delegate
             {
                 newPlayer.RestartCount = RestartCount + 1;
                 ValidForResume = false;
@@ -279,7 +260,7 @@ namespace osu.Game.Screens.Play
 
             Delay(500);
 
-            IsFailed = true;
+            HasFailed = true;
             failOverlay.Retries = RestartCount;
             failOverlay.Show();
         }
@@ -292,7 +273,8 @@ namespace osu.Game.Screens.Play
             Background?.FadeTo((100f - dimLevel) / 100, 1500, EasingTypes.OutQuint);
 
             Content.Alpha = 0;
-            dimLevel.ValueChanged += dimChanged;
+
+            dimLevel.ValueChanged += newDim => Background?.FadeTo((100f - newDim) / 100, 800);
 
             Content.ScaleTo(0.7f);
 
@@ -321,7 +303,7 @@ namespace osu.Game.Screens.Play
         {
             if (pauseOverlay == null) return false;
 
-            if (hasReplayLoaded)
+            if (HitRenderer.HasReplayLoaded)
                 return false;
 
             if (pauseOverlay.State != Visibility.Visible && !canPause) return true;
@@ -335,22 +317,13 @@ namespace osu.Game.Screens.Play
             {
                 FadeOut(250);
                 Content.ScaleTo(0.7f, 750, EasingTypes.InQuint);
-
-                dimLevel.ValueChanged -= dimChanged;
                 Background?.FadeTo(1f, 200);
                 return base.OnExiting(next);
             }
         }
 
-        private void dimChanged(object sender, EventArgs e)
-        {
-            Background?.FadeTo((100f - dimLevel) / 100, 800);
-        }
-
         private Bindable<bool> mouseWheelDisabled;
 
-        public ReplayInputHandler ReplayInputHandler;
-
-        protected override bool OnWheel(InputState state) => mouseWheelDisabled.Value && !IsPaused && !IsFailed;
+        protected override bool OnWheel(InputState state) => mouseWheelDisabled.Value && !IsPaused;
     }
 }
